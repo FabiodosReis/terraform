@@ -1,0 +1,49 @@
+name: terraform-apply
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pipeline-terraform-apply:
+    name: Run terraform apply
+    runs-on: ubuntu-latest
+    env:
+      TERRAFORM_REMOTE_STATE_S3: 'tfstate-2025-381492217956'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.TERRAFORM_USER }}
+          aws-secret-access-key: ${{ secrets.TERRAFORM_KEY }}
+          aws-region: ${{ secrets.TERRAFORM_REGION }}
+
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.12.2
+
+
+      - name: Check if terraform remote state bucket exists
+        run: |
+          if aws s3api head-bucket --bucket "${{ env.TERRAFORM_REMOTE_STATE_S3 }}" 2>/dev/null; then
+            echo "Bucket "${{ env.TERRAFORM_REMOTE_STATE }}" exists."
+            echo "bucket_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            cd modules/00-remote-state
+            terraform init
+            terraform apply -auto-approve
+          fi
+        env:
+          AWS_PAGER: "" # Disable AWS CLI pager to prevent interactive prompts
+
+
+      - name: Run terraform - create aws structure
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
